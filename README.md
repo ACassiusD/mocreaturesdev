@@ -19,3 +19,7 @@
 * Lead Developer, Codebase Cleanup, Spawn Logic, General Maintenance ~ ACGaming
 * Developer, Sound Artist, Language/Model Adjustments, General Maintenance ~ IcarussOne
 * QA Analyst & Testing, Entity Spawn Rules ~ xJon
+
+### In-game settings
+
+Press **O** (or the key bound under Options > Controls > MoCreatures) to open the MoCreatures settings screen. You can view all options from MoCSettings.cfg, toggle boolean settings by clicking their line, and use **Reload** / **Save** to re-read the config file or write changes. Changes apply for the current session; spawn multiplier and other options affect future spawns. No world reload is performed.

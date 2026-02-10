@@ -98,8 +98,9 @@ public class MoCProxy {
 
     //----------------CONFIG INITIALIZATION
     public void configInit() {
-        this.mocSettingsConfig = new MoCConfiguration(new File(FMLPaths.CONFIGDIR.get().toString(), "MoCreatures" + File.separator + "MoCSettings.cfg"));
-        this.mocEntityConfig = new MoCConfiguration(new File(FMLPaths.CONFIGDIR.get().toString(), "MoCreatures" + File.separator + "MoCreatures.cfg"));
+        File configDir = new File(FMLPaths.CONFIGDIR.get().toString(), "MoCreatures");
+        this.mocSettingsConfig = new MoCConfiguration(new File(configDir, "MoCSettings.cfg"));
+        this.mocEntityConfig = new MoCConfiguration(new File(configDir, "MoCreatures.cfg"));
         this.mocSettingsConfig.load();
         this.mocEntityConfig.load();
         this.readGlobalConfigValues();

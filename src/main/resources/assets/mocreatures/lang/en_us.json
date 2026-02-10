@@ -486,5 +486,14 @@
     "item.mocreatures.fly_spawn_egg": "Fly Spawn Egg",
     "item.mocreatures.grasshopper_spawn_egg": "Grasshopper Spawn Egg",
     "item.mocreatures.maggot_spawn_egg": "Maggot Spawn Egg",
-    "item.mocreatures.roach_spawn_egg": "Roach Spawn Egg"
+    "item.mocreatures.roach_spawn_egg": "Roach Spawn Egg",
+
+    "_comment_keys": "Keybindings",
+    "key.mocreatures.settings": "Open MoCreatures Settings",
+    "key.categories.mocreatures": "MoCreatures",
+
+    "_comment_gui": "GUI",
+    "gui.mocreatures.settings": "MoCreatures Settings",
+    "gui.mocreatures.reload": "Reload",
+    "gui.mocreatures.save": "Save"
 }

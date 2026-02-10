@@ -4,6 +4,7 @@
 package drzhark.mocreatures.client;
 
 import drzhark.mocreatures.MoCConstants;
+import drzhark.mocreatures.client.gui.MoCGUISettings;
 import drzhark.mocreatures.entity.IMoCEntity;
 import drzhark.mocreatures.network.MoCMessageHandler;
 import drzhark.mocreatures.network.message.MoCMessageEntityDive;
@@ -22,13 +23,28 @@ import net.minecraftforge.fml.common.Mod;
 public class MoCKeyHandler {
 
     static KeyBinding diveBinding = new KeyBinding("MoCreatures Dive", 90, "key.categories.movement");
+    static KeyBinding settingsBinding = new KeyBinding("key.mocreatures.settings", 79, "key.categories.mocreatures");
+    private static boolean wasSettingsKeyDown;
 
     public MoCKeyHandler() {
         ClientRegistry.registerKeyBinding(diveBinding);
+        ClientRegistry.registerKeyBinding(settingsBinding);
     }
 
     @SubscribeEvent
     public void onInput(TickEvent.PlayerTickEvent e) {
+        if (e.phase != TickEvent.Phase.END) {
+            return;
+        }
+        if (e.player != null && e.player.world != null && e.player.world.isRemote) {
+            if (!wasSettingsKeyDown && settingsBinding.isKeyDown()) {
+                MoCProxyClient.mc.displayGuiScreen(new MoCGUISettings());
+                wasSettingsKeyDown = true;
+            }
+            if (!settingsBinding.isKeyDown()) {
+                wasSettingsKeyDown = false;
+            }
+        }
 
         boolean kbJump = MoCProxyClient.mc.gameSettings.keyBindJump.isKeyDown();
         boolean kbDive = diveBinding.isKeyDown();
