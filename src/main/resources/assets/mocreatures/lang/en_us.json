@@ -495,5 +495,7 @@
     "_comment_gui": "GUI",
     "gui.mocreatures.settings": "MoCreatures Settings",
     "gui.mocreatures.reload": "Reload",
-    "gui.mocreatures.save": "Save"
+    "gui.mocreatures.save": "Save",
+    "gui.mocreatures.global_settings": "Global settings",
+    "gui.mocreatures.creature_spawns": "Creature spawns"
 }
