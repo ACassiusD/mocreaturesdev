@@ -8,8 +8,13 @@ import drzhark.mocreatures.MoCreatures;
 import drzhark.mocreatures.config.MoCConfigCategory;
 import drzhark.mocreatures.config.MoCConfiguration;
 import drzhark.mocreatures.config.MoCProperty;
+import net.minecraft.client.gui.screen.DirtMessageScreen;
+import net.minecraft.client.gui.screen.MainMenuScreen;
+import net.minecraft.client.gui.screen.MultiplayerScreen;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.button.Button;
+import net.minecraft.util.text.ITextComponent;
+import net.minecraft.util.text.StringTextComponent;
 import net.minecraft.util.text.TranslationTextComponent;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
@@ -27,6 +32,15 @@ public class MoCGUISettings extends Screen {
     private static final int PADDING = 10;
     private static final int TITLE_HEIGHT = 30;
     private static final int BOTTOM_BUTTON_HEIGHT = 30;
+
+    /**
+     * Spawn limits to match vanilla/Forge (MobSpawnInfo.Spawners, DefaultBiomeFeatures).
+     * Weight: 0 = disabled; upper bound 100 (vanilla e.g. creeper). Min/max group: 0–8 (vanilla uses 1–8).
+     */
+    private static final int FREQUENCY_MIN = 0;
+    private static final int FREQUENCY_MAX = 100;
+    private static final int SPAWN_GROUP_MIN = 0;
+    private static final int SPAWN_GROUP_MAX = 8;
 
     public enum ViewMode { GLOBAL_SETTINGS, CREATURE_SPAWNS }
 
@@ -49,7 +63,7 @@ public class MoCGUISettings extends Screen {
             return;
         }
         if (MoCreatures.proxy == null || MoCreatures.proxy.mocSettingsConfig == null) {
-            lines.add(new Line("No config loaded", false, null, null));
+            lines.add(new Line("No config loaded", false, null, null, null));
             return;
         }
         MoCConfiguration config = MoCreatures.proxy.mocSettingsConfig;
@@ -59,7 +73,7 @@ public class MoCGUISettings extends Screen {
             if (category == null || category.isChild()) {
                 continue;
             }
-            lines.add(new Line("--- " + catName + " ---", true, null, null));
+            lines.add(new Line("--- " + catName + " ---", true, null, null, null));
             Map<String, MoCProperty> values = category.getValues();
             if (values != null) {
                 for (Map.Entry<String, MoCProperty> entry : values.entrySet()) {
@@ -67,7 +81,7 @@ public class MoCGUISettings extends Screen {
                     if (prop == null) continue;
                     String typeChar = prop.getTypeMoC() == null ? "S" : String.valueOf(prop.getTypeMoC().name().charAt(0));
                     String value = prop.isList() ? "[list]" : prop.getString();
-                    lines.add(new Line("  " + prop.getName() + " = " + value + " (" + typeChar + ")", false, prop, null));
+                    lines.add(new Line("  " + prop.getName() + " = " + value + " (" + typeChar + ")", false, prop, null, null));
                 }
             }
         }
@@ -76,13 +90,13 @@ public class MoCGUISettings extends Screen {
 
     private void buildSpawnConfigLines() {
         if (MoCreatures.proxy == null || MoCreatures.proxy.mocEntityConfig == null) {
-            lines.add(new Line("No entity spawn config loaded", false, null, null));
+            lines.add(new Line("No entity spawn config loaded", false, null, null, null));
             return;
         }
         MoCConfiguration config = MoCreatures.proxy.mocEntityConfig;
         Set<String> categoryNames = config.getCategoryNames();
         if (categoryNames == null || categoryNames.isEmpty()) {
-            lines.add(new Line("No entity spawn config loaded", false, null, null));
+            lines.add(new Line("No entity spawn config loaded", false, null, null, null));
             return;
         }
         String[] spawnKeys = new String[] { "canSpawn", "frequency", "minSpawn", "maxSpawn" };
@@ -99,13 +113,18 @@ public class MoCGUISettings extends Screen {
             }
             if (!hasAnySpawnProp) continue;
             String displayName = toDisplayName(catName);
-            lines.add(new Line("--- " + displayName + " ---", true, null, null));
+            lines.add(new Line("--- " + displayName + " ---", true, null, null, null));
             for (String key : spawnKeys) {
                 MoCProperty prop = category.get(key);
                 if (prop == null) continue;
                 String value = prop.isList() ? "[list]" : prop.getString();
-                String hint = (prop.getTypeMoC() == MoCProperty.Type.INTEGER) ? " (L-click +1, R-click -1)" : "";
-                lines.add(new Line("  " + key + " = " + value + hint, false, prop, key));
+                String rangeHint = "";
+                if (prop.getTypeMoC() == MoCProperty.Type.INTEGER) {
+                    if ("frequency".equals(key)) rangeHint = " [" + FREQUENCY_MIN + "-" + FREQUENCY_MAX + "]";
+                    else if ("minSpawn".equals(key) || "maxSpawn".equals(key)) rangeHint = " [" + SPAWN_GROUP_MIN + "-" + SPAWN_GROUP_MAX + "]";
+                }
+                String hint = (prop.getTypeMoC() == MoCProperty.Type.INTEGER) ? " (L/R ±1)" + rangeHint : "";
+                lines.add(new Line("  " + key + " = " + value + hint, false, prop, key, catName));
             }
         }
         updateContentHeightAndScroll();
@@ -117,6 +136,22 @@ public class MoCGUISettings extends Screen {
             int visibleHeight = listBottom - listTop;
             int maxScroll = Math.max(0, totalContentHeight - visibleHeight);
             scrollOffset = Math.max(0, Math.min(scrollOffset, maxScroll));
+        }
+    }
+
+    private static ITextComponent getSpawnKeyTooltip(String spawnKey) {
+        if (spawnKey == null) return null;
+        switch (spawnKey) {
+            case "canSpawn":
+                return new StringTextComponent("Whether this creature can spawn. Click to toggle.");
+            case "frequency":
+                return new StringTextComponent("Spawn weight (relative chance vs other mobs). Higher = more common. 0 = disabled.");
+            case "minSpawn":
+                return new StringTextComponent("Minimum group size per spawn attempt.");
+            case "maxSpawn":
+                return new StringTextComponent("Maximum group size per spawn attempt. Must be ≥ minSpawn.");
+            default:
+                return null;
         }
     }
 
@@ -186,10 +221,25 @@ public class MoCGUISettings extends Screen {
             MoCreatures.proxy.readGlobalConfigValues();
         }
         buildLines();
+
+        // Return to main menu so spawn/config changes take effect on next world load
+        if (this.minecraft != null && this.minecraft.world != null) {
+            this.minecraft.world.sendQuittingDisconnectingPacket();
+            if (this.minecraft.isIntegratedServerRunning()) {
+                this.minecraft.unloadWorld(new DirtMessageScreen(new TranslationTextComponent("menu.savingLevel")));
+                this.minecraft.displayGuiScreen(new MainMenuScreen());
+            } else {
+                this.minecraft.unloadWorld();
+                this.minecraft.displayGuiScreen(new MultiplayerScreen(new MainMenuScreen()));
+            }
+        }
     }
 
     private static final int SCROLLBAR_WIDTH = 6;
     private static final int SCROLLBAR_PAD = 2;
+
+    private static final int BG_ALT = 0x0AFFFFFF;   // alternating block (subtle white)
+    private static final int BG_HEADER = 0x18FFFFFF; // header bar (slightly stronger)
 
     @Override
     public void render(MatrixStack matrixStack, int mouseX, int mouseY, float partialTicks) {
@@ -197,13 +247,38 @@ public class MoCGUISettings extends Screen {
         drawCenteredString(matrixStack, this.font, this.getTitle().getString(), this.width / 2, 12, 0xffffff);
         int contentHeight = listBottom - listTop;
         boolean showScrollbar = totalContentHeight > contentHeight && contentHeight > 0;
+        int listRight = getListRight();
         int y = listTop - scrollOffset;
+        int headerCount = 0;
+        Line hoveredSpawnLine = null;
         for (Line line : lines) {
-            if (y + LINE_HEIGHT >= listTop && y <= listBottom) {
-                int color = line.isHeader ? 0xffff00 : 0xcccccc;
+            boolean visible = y + LINE_HEIGHT >= listTop && y <= listBottom;
+            if (visible) {
+                if (viewMode == ViewMode.CREATURE_SPAWNS) {
+                    if (line.isHeader) {
+                        fill(matrixStack, PADDING, y, listRight, y + LINE_HEIGHT, BG_HEADER);
+                        headerCount++;
+                    } else {
+                        int blockIndex = headerCount - 1;
+                        if (blockIndex >= 0 && (blockIndex % 2) == 1) {
+                            fill(matrixStack, PADDING, y, listRight, y + LINE_HEIGHT, BG_ALT);
+                        }
+                        if (line.spawnKey != null && mouseX >= PADDING && mouseX <= listRight && mouseY >= y && mouseY < y + LINE_HEIGHT) {
+                            hoveredSpawnLine = line;
+                        }
+                    }
+                }
+                int color = line.isHeader ? 0xFFE0E0A0 : 0xFFCCCCCC;
                 this.font.drawString(matrixStack, line.text, PADDING, y, color);
             }
+            if (line.isHeader) headerCount++;
             y += LINE_HEIGHT;
+        }
+        if (hoveredSpawnLine != null && hoveredSpawnLine.spawnKey != null) {
+            ITextComponent tooltip = getSpawnKeyTooltip(hoveredSpawnLine.spawnKey);
+            if (tooltip != null) {
+                this.renderTooltip(matrixStack, tooltip, mouseX, mouseY);
+            }
         }
         if (showScrollbar) {
             int scrollbarLeft = this.width - PADDING - SCROLLBAR_WIDTH;
@@ -244,11 +319,16 @@ public class MoCGUISettings extends Screen {
                         } catch (NumberFormatException e) {
                             current = 0;
                         }
-                        int min = 0, max = 100;
+                        int min, max;
                         if ("frequency".equals(line.spawnKey)) {
-                            max = 100;
+                            min = FREQUENCY_MIN;
+                            max = FREQUENCY_MAX;
                         } else if ("minSpawn".equals(line.spawnKey) || "maxSpawn".equals(line.spawnKey)) {
-                            max = 20;
+                            min = SPAWN_GROUP_MIN;
+                            max = SPAWN_GROUP_MAX;
+                        } else {
+                            min = 0;
+                            max = 100;
                         }
                         if (button == 0) {
                             current = Math.min(current + 1, max);
@@ -258,6 +338,9 @@ public class MoCGUISettings extends Screen {
                             return false;
                         }
                         line.property.set(String.valueOf(current));
+                        if (line.spawnCategoryName != null && ("minSpawn".equals(line.spawnKey) || "maxSpawn".equals(line.spawnKey))) {
+                            enforceMinMaxSpawnOrder(line.spawnCategoryName, line.spawnKey, current);
+                        }
                         buildLines();
                         return true;
                     }
@@ -265,6 +348,35 @@ public class MoCGUISettings extends Screen {
             }
         }
         return super.mouseClicked(mouseX, mouseY, button);
+    }
+
+    /** Minecraft requires maxCount >= minCount (groupSize = minCount + nextInt(1 + maxCount - minCount)). */
+    private void enforceMinMaxSpawnOrder(String categoryName, String changedKey, int newValue) {
+        if (MoCreatures.proxy == null || MoCreatures.proxy.mocEntityConfig == null) return;
+        MoCConfigCategory category = MoCreatures.proxy.mocEntityConfig.getCategory(categoryName);
+        if (category == null) return;
+        MoCProperty minProp = category.get("minSpawn");
+        MoCProperty maxProp = category.get("maxSpawn");
+        if (minProp == null || maxProp == null) return;
+        int minVal = parsePropInt(minProp, 0);
+        int maxVal = parsePropInt(maxProp, 0);
+        if ("minSpawn".equals(changedKey)) {
+            if (newValue > maxVal) {
+                maxProp.set(String.valueOf(newValue));
+            }
+        } else {
+            if (newValue < minVal) {
+                minProp.set(String.valueOf(newValue));
+            }
+        }
+    }
+
+    private static int parsePropInt(MoCProperty prop, int defaultValue) {
+        try {
+            return prop != null && prop.value != null ? Integer.parseInt(prop.value) : defaultValue;
+        } catch (NumberFormatException e) {
+            return defaultValue;
+        }
     }
 
     @Override
@@ -285,12 +397,15 @@ public class MoCGUISettings extends Screen {
         final MoCProperty property;
         /** For spawn config: "canSpawn", "frequency", "minSpawn", "maxSpawn" (for integer bounds) */
         final String spawnKey;
+        /** For spawn config: entity category name (lowercase) so we can enforce min <= max. */
+        final String spawnCategoryName;
 
-        Line(String text, boolean isHeader, MoCProperty property, String spawnKey) {
+        Line(String text, boolean isHeader, MoCProperty property, String spawnKey, String spawnCategoryName) {
             this.text = text;
             this.isHeader = isHeader;
             this.property = property;
             this.spawnKey = spawnKey;
+            this.spawnCategoryName = spawnCategoryName;
         }
     }
 }
